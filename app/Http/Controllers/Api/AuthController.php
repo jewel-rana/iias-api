@@ -19,8 +19,9 @@ class AuthController extends Controller
 
         $phone = preg_replace('/\D+/', '', $data['phone']);
         $user = User::query()
-            ->where('phone', $phone)
-            ->orWhere('phone', $data['phone'])
+            ->where(function ($q) use ($phone, $data) {
+                $q->where('phone', $phone)->orWhere('phone', $data['phone']);
+            })
             ->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {

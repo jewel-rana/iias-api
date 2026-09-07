@@ -20,6 +20,7 @@ class JoinRequestController extends Controller
             'phone' => ['required', 'string'],
             'email' => ['nullable', 'email'],
             'referral_code' => ['nullable', 'string'],
+            'preferred_monthly_amount' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $referredBy = null;
@@ -31,17 +32,24 @@ class JoinRequestController extends Controller
             'full_name' => $data['full_name'],
             'phone' => $data['phone'],
             'email' => $data['email'] ?? null,
+            'preferred_monthly_amount' => $data['preferred_monthly_amount'] ?? null,
+            'referral_code' => $data['referral_code'] ?? null,
             'referred_by_member_id' => $referredBy,
             'status' => 'submitted',
         ]);
 
-        return response()->json(['id' => (string) $join->id, 'status' => $join->status], 201);
+        return response()->json($this->transform($join), 201);
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        $query = MemberJoinRequest::query()->latest();
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
+        }
+
         return response()->json([
-            'data' => MemberJoinRequest::query()->latest()->get(),
+            'data' => $query->get()->map(fn (MemberJoinRequest $j) => $this->transform($j)),
         ]);
     }
 
@@ -58,8 +66,14 @@ class JoinRequestController extends Controller
                 'name' => $joinRequest->full_name,
                 'phone' => $joinRequest->phone,
                 'monthly_amount' => $joinRequest->preferred_monthly_amount ?? 500,
-                'collector_name' => $request->user()?->name,
+                'collector_name' => $request->user()?->name ?? 'Unassigned',
                 'status' => 'unpaid',
+                'total_paid' => 0,
+                'outstanding' => $joinRequest->preferred_monthly_amount ?? 500,
+                'advance' => 0,
+                'paid_months' => 0,
+                'due_months' => 1,
+                'advance_months' => 0,
                 'referral_code' => strtoupper(Str::substr(Str::slug($joinRequest->full_name, ''), 0, 2)).'-'.random_int(1000, 9999),
             ]);
 
@@ -98,5 +112,20 @@ class JoinRequestController extends Controller
         ]);
 
         return response()->json(['message' => 'Rejected']);
+    }
+
+    private function transform(MemberJoinRequest $j): array
+    {
+        return [
+            'id' => (string) $j->id,
+            'full_name' => $j->full_name,
+            'phone' => $j->phone,
+            'email' => $j->email,
+            'preferred_monthly_amount' => $j->preferred_monthly_amount,
+            'referral_code' => $j->referral_code,
+            'status' => $j->status,
+            'rejection_reason' => $j->rejection_reason,
+            'created_at' => $j->created_at?->toIso8601String(),
+        ];
     }
 }

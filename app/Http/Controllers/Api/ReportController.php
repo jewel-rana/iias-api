@@ -12,6 +12,7 @@ class ReportController extends Controller
     {
         $members = Member::query()->get();
         $collected = (int) Payment::query()
+            ->whereIn('status', ['confirmed', 'completed'])
             ->whereMonth('payment_date', now()->month)
             ->whereYear('payment_date', now()->year)
             ->sum('amount');

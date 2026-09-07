@@ -14,17 +14,23 @@ class Payment extends Model
         'amount',
         'payment_method',
         'collector_name',
+        'wallet_account',
         'transaction_reference',
         'payment_date',
         'status',
         'idempotency_key',
         'created_by',
+        'submitted_by_role',
+        'reviewed_by',
+        'reviewed_at',
+        'rejection_reason',
     ];
 
     protected function casts(): array
     {
         return [
             'payment_date' => 'datetime',
+            'reviewed_at' => 'datetime',
         ];
     }
 

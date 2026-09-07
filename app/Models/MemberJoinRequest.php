@@ -14,6 +14,7 @@ class MemberJoinRequest extends Model
         'address',
         'photo_path',
         'preferred_monthly_amount',
+        'referral_code',
         'referred_by_member_id',
         'status',
         'rejection_reason',
