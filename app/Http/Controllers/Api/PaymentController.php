@@ -72,6 +72,8 @@ class PaymentController extends Controller
             'idempotency_key' => ['nullable', 'string'],
             'collector_name' => ['nullable', 'string', 'max:120'],
             'wallet_account' => ['nullable', 'string', 'max:40'],
+            'organization_wallet_label' => ['nullable', 'string', 'max:40'],
+            'organization_wallet_number' => ['nullable', 'string', 'max:40'],
             'transaction_reference' => ['nullable', 'string', 'max:80'],
             'allocations' => ['required', 'array', 'min:1'],
             'allocations.*.billing_month' => ['required', 'date'],
@@ -89,6 +91,37 @@ class PaymentController extends Controller
         }
 
         $member = Member::query()->findOrFail($data['member_id']);
+
+        if (($data['payment_method'] ?? '') === 'mobile_wallet') {
+            $wallets = OrganizationSetting::current()->wallets ?? [];
+            $toNumber = preg_replace('/\s+/', '', (string) ($data['organization_wallet_number'] ?? ''));
+            $fromNumber = preg_replace('/\s+/', '', (string) ($data['wallet_account'] ?? ''));
+            $txn = trim((string) ($data['transaction_reference'] ?? ''));
+            if ($wallets === []) {
+                return response()->json([
+                    'message' => 'Add organization wallet numbers in Settings first.',
+                ], 422);
+            }
+            $match = collect($wallets)->first(function ($wallet) use ($toNumber) {
+                $number = preg_replace('/\s+/', '', (string) ($wallet['number'] ?? ''));
+
+                return $number !== '' && $number === $toNumber;
+            });
+            if (! $match) {
+                return response()->json([
+                    'message' => 'Select an organization wallet (To).',
+                ], 422);
+            }
+            if ($fromNumber === '' || $txn === '') {
+                return response()->json([
+                    'message' => 'Enter customer wallet (From) and transaction ID.',
+                ], 422);
+            }
+            $data['organization_wallet_label'] = trim((string) ($match['label'] ?? $data['organization_wallet_label'] ?? ''));
+            $data['organization_wallet_number'] = $toNumber;
+            $data['wallet_account'] = $fromNumber;
+        }
+
         $payment = $this->service->createPayment(
             member: $member,
             amount: $data['amount'],
@@ -101,6 +134,8 @@ class PaymentController extends Controller
                 : ($data['collector_name'] ?? $user?->name),
             walletAccount: $data['wallet_account'] ?? null,
             transactionReference: $data['transaction_reference'] ?? null,
+            organizationWalletLabel: $data['organization_wallet_label'] ?? null,
+            organizationWalletNumber: $data['organization_wallet_number'] ?? null,
             requiresApproval: $isMemberSelf,
             submittedByRole: $user?->role,
         );
@@ -224,6 +259,8 @@ class PaymentController extends Controller
             'amount' => $p->amount,
             'payment_method' => $p->payment_method,
             'collector_name' => $p->collector_name,
+            'organization_wallet_label' => $p->organization_wallet_label,
+            'organization_wallet_number' => $p->organization_wallet_number,
             'wallet_account' => $p->wallet_account,
             'transaction_reference' => $p->transaction_reference,
             'payment_date' => $p->payment_date?->toIso8601String(),

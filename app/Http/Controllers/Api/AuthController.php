@@ -151,8 +151,29 @@ class AuthController extends Controller
             'role_code' => $user->accessRole?->code ?? $user->role,
             'role_name' => $user->accessRole?->name ?? $user->role,
             'permissions' => $user->permissionKeys(),
-            'member_id' => $user->member_id ? (string) $user->member_id : null,
+            'member_id' => $this->linkedMemberId($user),
         ];
+    }
+
+    private function linkedMemberId(User $user): ?string
+    {
+        if ($user->member_id) {
+            return (string) $user->member_id;
+        }
+
+        if (! filled($user->phone)) {
+            return null;
+        }
+
+        $member = Member::findByPhone($user->phone);
+        if (! $member) {
+            return null;
+        }
+
+        $user->member_id = $member->id;
+        $user->save();
+
+        return (string) $member->id;
     }
 
     private function appRole(User $user): string

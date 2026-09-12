@@ -109,6 +109,25 @@ class ProfileTest extends TestCase
         $this->assertSame('updated@example.com', $user->fresh()->email);
     }
 
+    public function test_me_links_staff_to_member_with_the_same_phone(): void
+    {
+        $member = $this->member(['phone' => '01755556666']);
+        $admin = User::factory()->create([
+            'name' => 'Admin Member',
+            'phone' => '01755556666',
+            'role' => 'admin',
+            'role_id' => Role::query()->where('code', 'admin')->value('id'),
+            'member_id' => null,
+        ]);
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('member_id', (string) $member->id);
+
+        $this->assertSame($member->id, $admin->fresh()->member_id);
+    }
+
     private function member(array $overrides = []): Member
     {
         return Member::query()->create(array_merge([

@@ -16,6 +16,7 @@ class OrganizationSetting extends Model
         'referral_enabled',
         'public_join_enabled',
         'opening_fund_balance',
+        'wallets',
     ];
 
     protected function casts(): array
@@ -27,6 +28,7 @@ class OrganizationSetting extends Model
             'public_join_enabled' => 'bool',
             'is_live' => 'bool',
             'went_live_at' => 'datetime',
+            'wallets' => 'array',
         ];
     }
 
@@ -42,6 +44,7 @@ class OrganizationSetting extends Model
             'referral_enabled' => true,
             'public_join_enabled' => true,
             'opening_fund_balance' => 0,
+            'wallets' => [],
         ]);
     }
 }

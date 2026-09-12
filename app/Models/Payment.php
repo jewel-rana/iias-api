@@ -14,6 +14,8 @@ class Payment extends Model
         'amount',
         'payment_method',
         'collector_name',
+        'organization_wallet_label',
+        'organization_wallet_number',
         'wallet_account',
         'transaction_reference',
         'payment_date',

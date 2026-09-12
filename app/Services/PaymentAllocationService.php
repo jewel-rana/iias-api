@@ -34,6 +34,8 @@ class PaymentAllocationService
         ?string $collectorName = null,
         ?string $walletAccount = null,
         ?string $transactionReference = null,
+        ?string $organizationWalletLabel = null,
+        ?string $organizationWalletNumber = null,
         bool $requiresApproval = false,
         ?string $submittedByRole = null,
     ): Payment {
@@ -60,6 +62,8 @@ class PaymentAllocationService
             $collectorName,
             $walletAccount,
             $transactionReference,
+            $organizationWalletLabel,
+            $organizationWalletNumber,
             $requiresApproval,
             $submittedByRole,
         ) {
@@ -72,6 +76,8 @@ class PaymentAllocationService
                 'amount' => $amount,
                 'payment_method' => $method,
                 'collector_name' => $collectorName,
+                'organization_wallet_label' => $organizationWalletLabel,
+                'organization_wallet_number' => $organizationWalletNumber,
                 'wallet_account' => $walletAccount,
                 'transaction_reference' => $transactionReference,
                 'payment_date' => now(),
