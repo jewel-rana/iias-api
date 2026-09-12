@@ -32,7 +32,7 @@ class PaymentController extends Controller
         }
 
         // Members only see their own payments.
-        if ($request->user()?->role === 'member' && $request->user()?->member_id) {
+        if ($request->user() && ! $request->user()->isStaff() && $request->user()->member_id) {
             $query->where('member_id', $request->user()->member_id);
         }
 
@@ -59,7 +59,7 @@ class PaymentController extends Controller
         ]);
 
         $user = $request->user();
-        $isMemberSelf = $user?->role === 'member';
+        $isMemberSelf = $user && ! $user->isStaff();
 
         if ($isMemberSelf) {
             if (! $user->member_id || (int) $user->member_id !== (int) $data['member_id']) {
@@ -105,8 +105,8 @@ class PaymentController extends Controller
 
     public function approve(Request $request, Payment $payment)
     {
-        if (! in_array($request->user()?->role, ['admin', 'collector'], true)) {
-            return response()->json(['message' => 'Only admin/collector can approve payments.'], 403);
+        if (! $request->user()?->hasPermission('payments.approve')) {
+            return response()->json(['message' => 'Only staff with approval permission can approve payments.'], 403);
         }
 
         $payment = $this->service->approve($payment, $request->user()?->id);
@@ -123,8 +123,8 @@ class PaymentController extends Controller
 
     public function reject(Request $request, Payment $payment)
     {
-        if (! in_array($request->user()?->role, ['admin', 'collector'], true)) {
-            return response()->json(['message' => 'Only admin/collector can reject payments.'], 403);
+        if (! $request->user()?->hasPermission('payments.approve')) {
+            return response()->json(['message' => 'Only staff with approval permission can reject payments.'], 403);
         }
 
         $data = $request->validate([

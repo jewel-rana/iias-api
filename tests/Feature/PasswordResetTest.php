@@ -23,9 +23,10 @@ class PasswordResetTest extends TestCase
             'phone' => '01900000000',
         ])->assertOk()
             ->assertJson([
-                'message' => 'If this number is registered, a reset code was sent.',
+                'message' => 'If this number is registered, a reset code was emailed.',
             ])
-            ->assertJsonMissingPath('debug_code');
+            ->assertJsonMissingPath('debug_code')
+            ->assertJsonMissingPath('email_hint');
 
         Mail::assertNothingSent();
     }
@@ -37,10 +38,10 @@ class PasswordResetTest extends TestCase
 
         $this->postJson('/api/v1/auth/forgot-password', [
             'phone' => '01712345678',
-        ])->assertOk();
+        ])->assertOk()->assertJsonPath('email_hint', 'a***@ummah.local');
 
         Mail::assertSent(PasswordResetCodeMail::class, function (PasswordResetCodeMail $mail) {
-            return $mail->hasTo('admin@ummah.local') && strlen($mail->code) === 6;
+            return $mail->hasTo('admin@ummah.local') && $mail->code === '111111';
         });
     }
 
@@ -57,6 +58,18 @@ class PasswordResetTest extends TestCase
         );
     }
 
+    public function test_member_without_email_cannot_receive_a_reset_code(): void
+    {
+        Mail::fake();
+        $this->member(['email' => null]);
+
+        $this->postJson('/api/v1/auth/forgot-password', [
+            'phone' => '01911785317',
+        ])->assertStatus(422)->assertJsonValidationErrors('email');
+
+        Mail::assertNothingSent();
+    }
+
     public function test_member_without_login_can_set_password_via_reset(): void
     {
         Mail::fake();
@@ -66,16 +79,13 @@ class PasswordResetTest extends TestCase
             'phone' => '01911785317',
         ])->assertOk();
 
-        $code = '';
-        Mail::assertSent(PasswordResetCodeMail::class, function (PasswordResetCodeMail $mail) use (&$code) {
-            $code = $mail->code;
-
-            return $mail->hasTo('member@example.com');
+        Mail::assertSent(PasswordResetCodeMail::class, function (PasswordResetCodeMail $mail) {
+            return $mail->hasTo('member@example.com') && $mail->code === '111111';
         });
 
         $this->postJson('/api/v1/auth/reset-password', [
             'phone' => '01911785317',
-            'code' => $code,
+            'code' => '111111',
             'password' => 'secret1',
             'password_confirmation' => 'secret1',
         ])->assertOk();
@@ -100,16 +110,13 @@ class PasswordResetTest extends TestCase
             'phone' => '01712345678',
         ])->assertOk();
 
-        $code = '';
-        Mail::assertSent(PasswordResetCodeMail::class, function (PasswordResetCodeMail $mail) use (&$code) {
-            $code = $mail->code;
-
-            return true;
+        Mail::assertSent(PasswordResetCodeMail::class, function (PasswordResetCodeMail $mail) {
+            return $mail->code === '111111';
         });
 
         $this->postJson('/api/v1/auth/reset-password', [
             'phone' => '01712345678',
-            'code' => $code,
+            'code' => '111111',
             'password' => 'newpass',
             'password_confirmation' => 'newpass',
         ])->assertOk();
@@ -157,9 +164,9 @@ class PasswordResetTest extends TestCase
         ]);
     }
 
-    private function member(): Member
+    private function member(array $overrides = []): Member
     {
-        return Member::query()->create([
+        return Member::query()->create(array_merge([
             'member_code' => 'M-001099',
             'name' => 'Test Member',
             'phone' => '01911785317',
@@ -174,6 +181,6 @@ class PasswordResetTest extends TestCase
             'due_months' => 1,
             'advance_months' => 0,
             'referral_code' => 'TM-1099',
-        ]);
+        ], $overrides));
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Member;
 use App\Models\MemberJoinRequest;
+use App\Models\Role;
 use App\Services\PaymentAllocationService;
 use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class JoinRequestController extends Controller
         $data = $request->validate([
             'full_name' => ['required', 'string'],
             'phone' => ['required', 'string'],
-            'email' => ['nullable', 'email'],
+            'email' => ['required', 'email'],
             'referral_code' => ['nullable', 'string'],
             'preferred_monthly_amount' => ['nullable', 'integer', 'min:1'],
         ]);
@@ -77,6 +78,7 @@ class JoinRequestController extends Controller
                 'name' => $joinRequest->full_name,
                 'phone' => $joinRequest->phone,
                 'email' => $joinRequest->email,
+                'role_id' => Role::memberId(),
                 'monthly_amount' => $joinRequest->preferred_monthly_amount ?? 500,
                 'collector_name' => $request->user()?->name ?? 'Unassigned',
                 'joined_at' => now()->toDateString(),

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Member extends Model
@@ -24,6 +25,7 @@ class Member extends Model
         'advance_months',
         'referral_code',
         'status_flag',
+        'role_id',
     ];
 
     protected function casts(): array
@@ -41,6 +43,11 @@ class Member extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function accessRole(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role_id');
     }
 
     public static function findByPhone(string $phone): ?self

@@ -130,7 +130,7 @@ class MeetingController extends Controller
 
     private function isStaff(Request $request): bool
     {
-        return in_array($request->user()?->role, ['admin', 'collector'], true);
+        return $request->user()?->isStaff() === true;
     }
 
     private function transform(Meeting $m): array

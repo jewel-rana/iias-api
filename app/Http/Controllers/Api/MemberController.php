@@ -4,15 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Member;
+use App\Models\Role;
+use App\Models\User;
 use App\Services\PaymentAllocationService;
 use Illuminate\Http\Request;
 
 class MemberController extends Controller
 {
     public function __construct(private PaymentAllocationService $dues) {}
+
     public function index(Request $request)
     {
-        $query = Member::query()->orderBy('name');
+        $query = Member::query()->with('accessRole')->orderBy('name');
 
         if ($search = $request->string('query')->toString()) {
             $query->where(function ($q) use ($search) {
@@ -34,6 +37,8 @@ class MemberController extends Controller
 
     public function show(Member $member)
     {
+        $member->loadMissing('accessRole');
+
         return response()->json($this->transform($member));
     }
 
@@ -42,7 +47,8 @@ class MemberController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'phone' => ['required', 'string', 'max:30', 'unique:members,phone'],
-            'email' => ['nullable', 'email', 'max:120', 'unique:members,email'],
+            'email' => ['required', 'email', 'max:120', 'unique:members,email'],
+            'role_id' => ['nullable', 'exists:roles,id'],
             'monthly_amount' => ['required', 'integer', 'min:1'],
             'collector_name' => ['nullable', 'string', 'max:120'],
             'joined_at' => ['required', 'date', 'before_or_equal:today'],
@@ -60,7 +66,8 @@ class MemberController extends Controller
             'member_code' => 'M-'.str_pad((string) $count, 6, '0', STR_PAD_LEFT),
             'name' => $data['name'],
             'phone' => $data['phone'],
-            'email' => $data['email'] ?? null,
+            'email' => $data['email'],
+            'role_id' => $data['role_id'] ?? Role::memberId(),
             'monthly_amount' => $data['monthly_amount'],
             'collector_name' => $data['collector_name'] ?? 'Unassigned',
             'joined_at' => $joinedAt,
@@ -76,7 +83,34 @@ class MemberController extends Controller
 
         $this->dues->ensureDuesFromJoinDate($member->fresh());
 
-        return response()->json($this->transform($member->fresh()), 201);
+        return response()->json($this->transform($member->fresh()->load('accessRole')), 201);
+    }
+
+    public function update(Request $request, Member $member)
+    {
+        $data = $request->validate([
+            'email' => ['sometimes', 'email', 'max:120', 'unique:members,email,'.$member->id],
+            'role_id' => ['sometimes', 'exists:roles,id'],
+        ]);
+
+        $member->update($data);
+
+        $user = User::query()->where('member_id', $member->id)->first();
+        if ($user && isset($data['email']) && preg_match('/^\d+(\.\d+)?@ummah\.local$/i', (string) $user->email)) {
+            $user->email = $data['email'];
+            $user->save();
+        }
+
+        if (array_key_exists('role_id', $data)) {
+            $role = Role::query()->find($data['role_id']);
+            if ($user && $role && $user->role !== 'admin') {
+                $user->role = $role->code;
+                $user->role_id = $role->id;
+                $user->save();
+            }
+        }
+
+        return response()->json($this->transform($member->fresh()->load('accessRole')));
     }
 
     public function dues(Member $member)
@@ -105,6 +139,9 @@ class MemberController extends Controller
             'name' => $m->name,
             'phone' => $m->phone,
             'email' => $m->email,
+            'role_id' => $m->role_id ? (string) $m->role_id : null,
+            'role_name' => $m->accessRole?->name,
+            'role_code' => $m->accessRole?->code,
             'monthly_amount' => $m->monthly_amount,
             'collector_name' => $m->collector_name,
             'joined_at' => $m->joined_at?->toDateString(),

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Member;
+use App\Models\Role;
 use App\Models\User;
 
 class MemberAccountService
@@ -12,6 +13,10 @@ class MemberAccountService
         $phone = preg_replace('/\D+/', '', $member->phone) ?: $member->phone;
         $user = User::findByPhone($member->phone) ?? User::findByPhone($phone);
         $email = $this->emailFor($member, $user);
+        $member->loadMissing('accessRole');
+
+        $role = $member->accessRole ?? Role::query()->where('code', 'member')->first();
+        $roleCode = $role?->code ?? 'member';
 
         if ($user) {
             $user->fill([
@@ -22,7 +27,8 @@ class MemberAccountService
                 'member_id' => $member->id,
             ]);
             if (! in_array($user->role, ['admin', 'collector'], true)) {
-                $user->role = 'member';
+                $user->role = $roleCode;
+                $user->role_id = $role?->id;
             }
             $user->save();
             $user->tokens()->delete();
@@ -35,7 +41,8 @@ class MemberAccountService
             'phone' => $phone,
             'email' => $email,
             'password' => $password,
-            'role' => 'member',
+            'role' => $roleCode,
+            'role_id' => $role?->id,
             'member_id' => $member->id,
         ]);
     }

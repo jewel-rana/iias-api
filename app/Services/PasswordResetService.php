@@ -17,20 +17,29 @@ class PasswordResetService
 
     public const MAX_ATTEMPTS = 5;
 
-    public function __construct(
-        private PushNotificationService $push,
-        private MemberAccountService $accounts,
-    ) {}
+    public const DEFAULT_CODE = '111111';
 
-    public function requestCode(string $phone): ?string
+    public function __construct(private MemberAccountService $accounts) {}
+
+    /**
+     * @return array{debug_code: string|null, email_hint: string|null}
+     */
+    public function requestCode(string $phone): array
     {
         $user = User::findByPhone($phone);
         $member = Member::findByPhone($phone);
         if (! $user && ! $member) {
-            return null;
+            return ['debug_code' => null, 'email_hint' => null];
         }
 
-        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $email = $this->deliverableEmail($user, $member);
+        if ($email === null) {
+            throw ValidationException::withMessages([
+                'email' => ['This account has no email. Ask an admin to add one.'],
+            ]);
+        }
+
+        $code = self::DEFAULT_CODE;
 
         Cache::put($this->cacheKey($phone), [
             'hash' => Hash::make($code),
@@ -39,38 +48,28 @@ class PasswordResetService
             'member_id' => $member?->id ?? $user?->member_id,
         ], now()->addMinutes(self::TTL_MINUTES));
 
-        $email = $user?->email ?: $member?->email;
-        if (filled($email)) {
-            try {
-                Mail::to($email)->send(new PasswordResetCodeMail($code));
-            } catch (\Throwable $e) {
-                Log::warning('Password reset email failed', [
-                    'user_id' => $user?->id,
-                    'member_id' => $member?->id,
-                    'message' => $e->getMessage(),
-                ]);
-            }
+        try {
+            Mail::to($email)->send(new PasswordResetCodeMail($code));
+        } catch (\Throwable $e) {
+            Log::warning('Password reset email failed', [
+                'user_id' => $user?->id,
+                'member_id' => $member?->id,
+                'message' => $e->getMessage(),
+            ]);
         }
 
-        if ($user) {
-            $this->push->notifyUsers(
-                [$user->id],
-                'Password reset code',
-                "Your code is {$code}. It expires in 15 minutes.",
-            );
-        }
-
-        Log::info('Password reset code generated', [
+        Log::info('Password reset code emailed', [
             'user_id' => $user?->id,
             'member_id' => $member?->id,
         ]);
 
         $mailer = (string) config('mail.default');
-        if (config('app.debug') && in_array($mailer, ['log', 'array'], true)) {
-            return $code;
-        }
+        $debug = config('app.debug') && in_array($mailer, ['log', 'array'], true);
 
-        return null;
+        return [
+            'debug_code' => $debug ? $code : null,
+            'email_hint' => $this->maskEmail($email),
+        ];
     }
 
     public function reset(string $phone, string $code, string $password): void
@@ -127,6 +126,34 @@ class PasswordResetService
         }
 
         Cache::forget($key);
+    }
+
+    private function deliverableEmail(?User $user, ?Member $member): ?string
+    {
+        foreach ([$user?->email, $member?->email] as $email) {
+            if ($this->isDeliverable($email)) {
+                return $email;
+            }
+        }
+
+        return null;
+    }
+
+    private function isDeliverable(?string $email): bool
+    {
+        if (! filled($email) || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        return preg_match('/^\d+(\.\d+)?@ummah\.local$/i', $email) !== 1;
+    }
+
+    private function maskEmail(string $email): string
+    {
+        [$local, $domain] = explode('@', $email, 2);
+        $visible = mb_substr($local, 0, 1);
+
+        return $visible.'***@'.$domain;
     }
 
     private function cacheKey(string $phone): string

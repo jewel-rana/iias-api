@@ -43,27 +43,13 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => [
-                'id' => (string) $user->id,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'role' => $user->role,
-                'member_id' => $user->member_id ? (string) $user->member_id : null,
-            ],
+            'user' => $this->payload($user),
         ]);
     }
 
     public function me(Request $request)
     {
-        $user = $request->user();
-
-        return response()->json([
-            'id' => (string) $user->id,
-            'name' => $user->name,
-            'phone' => $user->phone,
-            'role' => $user->role,
-            'member_id' => $user->member_id ? (string) $user->member_id : null,
-        ]);
+        return response()->json($this->payload($request->user()));
     }
 
     public function logout(Request $request)
@@ -79,12 +65,13 @@ class AuthController extends Controller
             'phone' => ['required', 'string'],
         ]);
 
-        $debugCode = $resets->requestCode($data['phone']);
+        $result = $resets->requestCode($data['phone']);
 
         return response()->json(array_filter([
-            'message' => 'If this number is registered, a reset code was sent.',
-            'debug_code' => $debugCode,
-        ]));
+            'message' => 'If this number is registered, a reset code was emailed.',
+            'email_hint' => $result['email_hint'],
+            'debug_code' => $result['debug_code'],
+        ], fn ($value) => $value !== null && $value !== ''));
     }
 
     public function resetPassword(Request $request, PasswordResetService $resets)
@@ -100,5 +87,23 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Password updated. You can log in now.',
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payload(User $user): array
+    {
+        $user->loadMissing('accessRole');
+
+        return [
+            'id' => (string) $user->id,
+            'name' => $user->name,
+            'phone' => $user->phone,
+            'role' => $user->role,
+            'role_name' => $user->accessRole?->name ?? $user->role,
+            'permissions' => $user->permissionKeys(),
+            'member_id' => $user->member_id ? (string) $user->member_id : null,
+        ];
     }
 }

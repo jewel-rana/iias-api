@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\OrganizationSettingController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\RoleController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -30,6 +31,13 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/roles', [RoleController::class, 'index']);
+        Route::get('/permission-catalog', [RoleController::class, 'catalog']);
+        Route::middleware('permission:roles.manage')->group(function () {
+            Route::post('/roles', [RoleController::class, 'store']);
+            Route::put('/roles/{role}', [RoleController::class, 'update']);
+            Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+        });
         Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
         Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
 
@@ -47,6 +55,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/members', [MemberController::class, 'index']);
         Route::post('/members', [MemberController::class, 'store']);
         Route::get('/members/{member}', [MemberController::class, 'show']);
+        Route::put('/members/{member}', [MemberController::class, 'update']);
         Route::get('/members/{member}/dues', [MemberController::class, 'dues']);
 
         Route::get('/payments', [PaymentController::class, 'index']);
