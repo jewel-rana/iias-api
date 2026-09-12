@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Member;
+use App\Services\PaymentAllocationService;
 use Illuminate\Http\Request;
 
 class MemberController extends Controller
 {
+    public function __construct(private PaymentAllocationService $dues) {}
     public function index(Request $request)
     {
         $query = Member::query()->orderBy('name');
@@ -16,7 +18,8 @@ class MemberController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('member_code', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -39,8 +42,10 @@ class MemberController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'phone' => ['required', 'string', 'max:30', 'unique:members,phone'],
+            'email' => ['nullable', 'email', 'max:120', 'unique:members,email'],
             'monthly_amount' => ['required', 'integer', 'min:1'],
             'collector_name' => ['nullable', 'string', 'max:120'],
+            'joined_at' => ['required', 'date', 'before_or_equal:today'],
         ]);
 
         $count = Member::query()->count() + 1024;
@@ -50,12 +55,15 @@ class MemberController extends Controller
             ->map(fn ($p) => strtoupper(substr($p, 0, 1)))
             ->implode('');
 
+        $joinedAt = $data['joined_at'];
         $member = Member::query()->create([
             'member_code' => 'M-'.str_pad((string) $count, 6, '0', STR_PAD_LEFT),
             'name' => $data['name'],
             'phone' => $data['phone'],
+            'email' => $data['email'] ?? null,
             'monthly_amount' => $data['monthly_amount'],
             'collector_name' => $data['collector_name'] ?? 'Unassigned',
+            'joined_at' => $joinedAt,
             'status' => 'unpaid',
             'total_paid' => 0,
             'outstanding' => $data['monthly_amount'],
@@ -66,11 +74,15 @@ class MemberController extends Controller
             'referral_code' => ($initials !== '' ? $initials : 'MB').'-'.$count,
         ]);
 
-        return response()->json($this->transform($member), 201);
+        $this->dues->ensureDuesFromJoinDate($member->fresh());
+
+        return response()->json($this->transform($member->fresh()), 201);
     }
 
     public function dues(Member $member)
     {
+        $this->dues->ensureDuesFromJoinDate($member);
+
         $dues = $member->dues()->orderBy('billing_month')->get();
 
         return response()->json([
@@ -92,8 +104,10 @@ class MemberController extends Controller
             'member_code' => $m->member_code,
             'name' => $m->name,
             'phone' => $m->phone,
+            'email' => $m->email,
             'monthly_amount' => $m->monthly_amount,
             'collector_name' => $m->collector_name,
+            'joined_at' => $m->joined_at?->toDateString(),
             'status' => $m->status,
             'total_paid' => $m->total_paid,
             'outstanding' => $m->outstanding,

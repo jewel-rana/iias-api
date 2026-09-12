@@ -198,6 +198,39 @@ class PaymentAllocationService
         });
     }
 
+    public function ensureDuesFromJoinDate(Member $member): void
+    {
+        $end = now()->startOfMonth();
+        $start = $member->joined_at
+            ? Carbon::parse($member->joined_at)->startOfMonth()
+            : $end->copy();
+
+        if ($start->greaterThan($end)) {
+            $end = $start->copy();
+        }
+
+        $maxStart = $end->copy()->subMonths(35);
+        if ($start->lessThan($maxStart)) {
+            $start = $maxStart;
+        }
+
+        for ($month = $start->copy(); $month->lte($end); $month->addMonth()) {
+            MonthlyDue::query()->firstOrCreate(
+                [
+                    'member_id' => $member->id,
+                    'billing_month' => $month->toDateString(),
+                ],
+                [
+                    'amount_due' => $member->monthly_amount,
+                    'amount_paid' => 0,
+                    'status' => 'unpaid',
+                ]
+            );
+        }
+
+        $this->recalculateMemberSummary($member->fresh());
+    }
+
     public function recalculateMemberSummary(Member $member): void
     {
         $dues = $member->dues()->get();

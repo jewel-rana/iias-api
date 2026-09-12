@@ -11,8 +11,10 @@ class Member extends Model
         'member_code',
         'name',
         'phone',
+        'email',
         'monthly_amount',
         'collector_name',
+        'joined_at',
         'status',
         'total_paid',
         'outstanding',
@@ -23,6 +25,13 @@ class Member extends Model
         'referral_code',
         'status_flag',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'joined_at' => 'date',
+        ];
+    }
 
     public function dues(): HasMany
     {

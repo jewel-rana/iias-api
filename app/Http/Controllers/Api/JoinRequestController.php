@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Member;
 use App\Models\MemberJoinRequest;
 use App\Models\User;
+use App\Services\PaymentAllocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,7 @@ use Illuminate\Support\Str;
 
 class JoinRequestController extends Controller
 {
+    public function __construct(private PaymentAllocationService $dues) {}
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -65,8 +67,10 @@ class JoinRequestController extends Controller
                 'member_code' => $code,
                 'name' => $joinRequest->full_name,
                 'phone' => $joinRequest->phone,
+                'email' => $joinRequest->email,
                 'monthly_amount' => $joinRequest->preferred_monthly_amount ?? 500,
                 'collector_name' => $request->user()?->name ?? 'Unassigned',
+                'joined_at' => now()->toDateString(),
                 'status' => 'unpaid',
                 'total_paid' => 0,
                 'outstanding' => $joinRequest->preferred_monthly_amount ?? 500,
@@ -76,6 +80,8 @@ class JoinRequestController extends Controller
                 'advance_months' => 0,
                 'referral_code' => strtoupper(Str::substr(Str::slug($joinRequest->full_name, ''), 0, 2)).'-'.random_int(1000, 9999),
             ]);
+
+            $this->dues->ensureDuesFromJoinDate($member->fresh());
 
             User::query()->updateOrCreate(
                 ['phone' => preg_replace('/\D+/', '', $joinRequest->phone)],

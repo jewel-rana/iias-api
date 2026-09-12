@@ -28,6 +28,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/dashboard', [PaymentController::class, 'dashboard']);
 
         Route::get('/expenses', [ExpenseController::class, 'index']);
+        Route::get('/expenses/salary-dues', [ExpenseController::class, 'salaryDues']);
         Route::post('/expenses', [ExpenseController::class, 'store']);
 
         Route::get('/expense-heads', [ExpenseHeadController::class, 'index']);

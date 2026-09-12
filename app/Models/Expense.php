@@ -14,6 +14,7 @@ class Expense extends Model
         'recurrence',
         'amount',
         'expense_date',
+        'period_month',
         'payment_method',
         'notes',
         'created_by',
@@ -24,6 +25,7 @@ class Expense extends Model
         return [
             'amount' => 'integer',
             'expense_date' => 'date',
+            'period_month' => 'date',
         ];
     }
 
