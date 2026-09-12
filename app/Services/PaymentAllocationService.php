@@ -198,6 +198,57 @@ class PaymentAllocationService
         });
     }
 
+    public function applyMonthlyAmount(Member $member, int $amount): void
+    {
+        foreach ($member->dues()->get() as $due) {
+            if ($due->status === 'paid') {
+                continue;
+            }
+
+            $due->amount_due = $amount;
+            $due->refreshStatus();
+        }
+
+        $this->recalculateMemberSummary($member->fresh());
+    }
+
+    public function delete(Payment $payment): void
+    {
+        DB::transaction(function () use ($payment) {
+            $payment->load('allocations', 'member');
+
+            foreach ($payment->allocations as $allocation) {
+                if ($allocation->status === 'applied') {
+                    $due = $allocation->monthly_due_id
+                        ? MonthlyDue::query()->find($allocation->monthly_due_id)
+                        : null;
+
+                    if (! $due) {
+                        $month = Carbon::parse($allocation->billing_month)->startOfMonth()->toDateString();
+                        $due = MonthlyDue::query()
+                            ->where('member_id', $payment->member_id)
+                            ->whereDate('billing_month', $month)
+                            ->first();
+                    }
+
+                    if ($due) {
+                        $due->amount_paid = max(0, (int) $due->amount_paid - (int) $allocation->amount);
+                        $due->refreshStatus();
+                    }
+                }
+
+                $allocation->delete();
+            }
+
+            $member = $payment->member;
+            $payment->delete();
+
+            if ($member) {
+                $this->recalculateMemberSummary($member->fresh());
+            }
+        });
+    }
+
     public function ensureDuesFromJoinDate(Member $member): void
     {
         $end = now()->startOfMonth();

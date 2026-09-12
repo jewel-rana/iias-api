@@ -111,9 +111,14 @@ class MemberController extends Controller
 
     public function update(Request $request, Member $member)
     {
+        if (! $request->user()?->hasPermission('members.create')) {
+            return response()->json(['message' => 'Only staff can update members.'], 403);
+        }
+
         $data = $request->validate([
             'email' => ['sometimes', 'email', 'max:120', 'unique:members,email,'.$member->id],
             'role_id' => ['sometimes', 'exists:roles,id'],
+            'monthly_amount' => ['sometimes', 'integer', 'min:1'],
         ]);
 
         $member->update($data);
@@ -131,6 +136,10 @@ class MemberController extends Controller
                 $user->role_id = $role->id;
                 $user->save();
             }
+        }
+
+        if (array_key_exists('monthly_amount', $data)) {
+            $this->dues->applyMonthlyAmount($member->fresh(), (int) $data['monthly_amount']);
         }
 
         return response()->json($this->transform($member->fresh()->load('accessRole')));

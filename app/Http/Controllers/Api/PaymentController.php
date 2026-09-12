@@ -141,6 +141,17 @@ class PaymentController extends Controller
         return response()->json($this->transform($payment));
     }
 
+    public function destroy(Request $request, Payment $payment)
+    {
+        if (! $request->user()?->isStaff() || ! $request->user()?->hasPermission('collection.collect')) {
+            return response()->json(['message' => 'Only staff can delete payments.'], 403);
+        }
+
+        $this->service->delete($payment);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function reject(Request $request, Payment $payment)
     {
         if (! $request->user()?->hasPermission('payments.approve')) {

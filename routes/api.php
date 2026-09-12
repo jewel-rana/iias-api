@@ -63,6 +63,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/payments/{payment}', [PaymentController::class, 'show']);
         Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve']);
         Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject']);
+        Route::delete('/payments/{payment}', [PaymentController::class, 'destroy']);
 
         Route::get('/events', [EventController::class, 'index']);
         Route::post('/events', [EventController::class, 'store']);
