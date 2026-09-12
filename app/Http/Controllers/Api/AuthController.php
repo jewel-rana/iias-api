@@ -147,10 +147,20 @@ class AuthController extends Controller
             'name' => $user->name,
             'phone' => $user->phone,
             'email' => $user->email,
-            'role' => $user->role,
+            'role' => $this->appRole($user),
+            'role_code' => $user->accessRole?->code ?? $user->role,
             'role_name' => $user->accessRole?->name ?? $user->role,
             'permissions' => $user->permissionKeys(),
             'member_id' => $user->member_id ? (string) $user->member_id : null,
         ];
+    }
+
+    private function appRole(User $user): string
+    {
+        if ($user->role === 'admin' || $user->accessRole?->code === 'admin') {
+            return 'admin';
+        }
+
+        return $user->isStaff() ? 'collector' : 'member';
     }
 }

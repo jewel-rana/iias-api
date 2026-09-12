@@ -45,13 +45,27 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
-        if ($this->role === 'admin') {
+        $this->loadMissing('accessRole');
+
+        if ($this->role === 'admin' || $this->accessRole?->code === 'admin') {
             return true;
         }
 
-        $this->loadMissing('accessRole');
+        if ($this->accessRole?->allows($permission)) {
+            return true;
+        }
 
-        return $this->accessRole?->allows($permission) ?? false;
+        // Legacy collector rows may have the role string but an empty permission set.
+        if ($this->role === 'collector' || $this->accessRole?->code === 'collector') {
+            return ! in_array($permission, [
+                Permissions::ROLES_MANAGE,
+                Permissions::ORGANIZATION_MANAGE,
+                Permissions::EXPENSE_HEADS_MANAGE,
+                Permissions::COMMITTEE_MANAGE,
+            ], true);
+        }
+
+        return false;
     }
 
     /**
@@ -59,13 +73,22 @@ class User extends Authenticatable
      */
     public function permissionKeys(): array
     {
-        if ($this->role === 'admin') {
+        $this->loadMissing('accessRole');
+
+        if ($this->role === 'admin' || $this->accessRole?->code === 'admin') {
             return Permissions::keys();
         }
 
-        $this->loadMissing('accessRole');
+        $keys = Permissions::expand($this->accessRole?->permissions);
+        if ($keys !== []) {
+            return $keys;
+        }
 
-        return Permissions::expand($this->accessRole?->permissions);
+        if ($this->role === 'collector' || $this->accessRole?->code === 'collector') {
+            return Permissions::collector();
+        }
+
+        return [];
     }
 
     public function isStaff(): bool
@@ -76,7 +99,13 @@ class User extends Authenticatable
 
         $this->loadMissing('accessRole');
 
-        return $this->accessRole?->isStaff() ?? false;
+        return $this->accessRole?->isStaff()
+            || $this->hasPermission(Permissions::COLLECTION_COLLECT);
+    }
+
+    public function canCollectPayments(): bool
+    {
+        return $this->hasPermission(Permissions::COLLECTION_COLLECT);
     }
 
     public static function findByPhone(string $phone): ?self

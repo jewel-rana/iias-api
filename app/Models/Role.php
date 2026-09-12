@@ -50,6 +50,7 @@ class Role extends Model
         return $this->allows(Permissions::ALL)
             || $this->allows(Permissions::MEMBERS_VIEW)
             || $this->allows(Permissions::COLLECTION_VIEW)
+            || $this->allows(Permissions::COLLECTION_COLLECT)
             || $this->allows(Permissions::ROLES_MANAGE);
     }
 

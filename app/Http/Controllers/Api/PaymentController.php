@@ -79,7 +79,8 @@ class PaymentController extends Controller
         ]);
 
         $user = $request->user();
-        $isMemberSelf = $user && ! $user->isStaff();
+        $canCollect = $user?->canCollectPayments() === true;
+        $isMemberSelf = $user && ! $canCollect;
 
         if ($isMemberSelf) {
             if (! $user->member_id || (int) $user->member_id !== (int) $data['member_id']) {
