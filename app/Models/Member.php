@@ -45,6 +45,11 @@ class Member extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function donations(): HasMany
+    {
+        return $this->hasMany(EventDonation::class);
+    }
+
     public function accessRole(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'role_id');

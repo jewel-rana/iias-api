@@ -52,6 +52,39 @@ class EventController extends Controller
         return response()->json($this->transform($event), 201);
     }
 
+    public function donations(Request $request)
+    {
+        $query = EventDonation::query()->with(['event', 'referredBy'])->latest('payment_date');
+
+        if ($request->filled('member_id')) {
+            $member = Member::query()->find($request->integer('member_id'));
+            if (! $member) {
+                return response()->json(['data' => []]);
+            }
+            $query->where(function ($q) use ($member) {
+                $q->where('member_id', $member->id);
+                if ($member->phone) {
+                    $q->orWhere('donor_phone', $member->phone);
+                }
+            });
+        }
+
+        $user = $request->user();
+        if ($user && ! $user->isStaff() && $user->member_id) {
+            $own = Member::query()->find($user->member_id);
+            $query->where(function ($q) use ($user, $own) {
+                $q->where('member_id', $user->member_id);
+                if ($own?->phone) {
+                    $q->orWhere('donor_phone', $own->phone);
+                }
+            });
+        }
+
+        return response()->json([
+            'data' => $query->limit(100)->get()->map(fn (EventDonation $d) => $this->transformDonation($d)),
+        ]);
+    }
+
     public function donate(Request $request, FundraisingEvent $event)
     {
         $data = $request->validate([
@@ -60,20 +93,30 @@ class EventController extends Controller
             'donor_phone' => ['nullable', 'string'],
             'amount' => ['required', 'integer', 'min:1'],
             'payment_method' => ['required', 'string'],
+            'member_id' => ['nullable', 'exists:members,id'],
             'referred_by_member_id' => ['nullable', 'exists:members,id'],
             'idempotency_key' => ['nullable', 'string'],
         ]);
+
+        $memberId = $data['member_id'] ?? null;
+        if ($data['donor_type'] === 'member' && ! $memberId && ! empty($data['donor_phone'])) {
+            $memberId = Member::findByPhone($data['donor_phone'])?->id;
+        }
+        if ($data['donor_type'] !== 'member') {
+            $memberId = null;
+        }
 
         $key = $data['idempotency_key'] ?? (string) Str::uuid();
         if ($existing = EventDonation::query()->where('idempotency_key', $key)->first()) {
             return response()->json($this->transformDonation($existing->load('event', 'referredBy')));
         }
 
-        $donation = DB::transaction(function () use ($event, $data, $key, $request) {
+        $donation = DB::transaction(function () use ($event, $data, $key, $request, $memberId) {
             $donation = EventDonation::query()->create([
                 'receipt_number' => 'D-'.(20000 + EventDonation::query()->count() + 1),
                 'fundraising_event_id' => $event->id,
                 'donor_type' => $data['donor_type'],
+                'member_id' => $memberId,
                 'donor_name' => $data['donor_name'],
                 'donor_phone' => $data['donor_phone'] ?? null,
                 'referred_by_member_id' => $data['referred_by_member_id'] ?? null,
@@ -149,6 +192,7 @@ class EventController extends Controller
             'donor_type' => $d->donor_type,
             'donor_name' => $d->donor_name,
             'donor_phone' => $d->donor_phone,
+            'member_id' => $d->member_id ? (string) $d->member_id : null,
             'amount' => $d->amount,
             'payment_method' => $d->payment_method,
             'payment_date' => $d->payment_date?->toIso8601String(),

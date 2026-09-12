@@ -39,7 +39,7 @@ class PasswordResetService
             ]);
         }
 
-        $code = self::DEFAULT_CODE;
+        $code = $this->generateCode();
 
         Cache::put($this->cacheKey($phone), [
             'hash' => Hash::make($code),
@@ -126,6 +126,15 @@ class PasswordResetService
         }
 
         Cache::forget($key);
+    }
+
+    private function generateCode(): string
+    {
+        if (app()->isLocal()) {
+            return self::DEFAULT_CODE;
+        }
+
+        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 
     private function deliverableEmail(?User $user, ?Member $member): ?string

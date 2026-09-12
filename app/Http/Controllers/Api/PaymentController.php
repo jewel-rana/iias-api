@@ -10,6 +10,7 @@ use App\Models\OrganizationSetting;
 use App\Models\Payment;
 use App\Services\PaymentAllocationService;
 use App\Services\PushNotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
@@ -31,16 +32,35 @@ class PaymentController extends Controller
             $query->where('member_id', $request->integer('member_id'));
         }
 
+        if ($request->filled('billing_month')) {
+            try {
+                $month = Carbon::parse((string) $request->input('billing_month'))->startOfMonth()->toDateString();
+                $query->whereHas('allocations', fn ($q) => $q->whereDate('billing_month', $month));
+            } catch (\Throwable) {
+                // Ignore an invalid month filter.
+            }
+        }
+
         // Members only see their own payments.
         if ($request->user() && ! $request->user()->isStaff() && $request->user()->member_id) {
             $query->where('member_id', $request->user()->member_id);
         }
 
-        $payments = $query->limit(100)->get();
+        $payments = $query->limit(200)->get();
 
         return response()->json([
             'data' => $payments->map(fn (Payment $p) => $this->transform($p)),
         ]);
+    }
+
+    public function show(Request $request, Payment $payment)
+    {
+        $user = $request->user();
+        if ($user && ! $user->isStaff() && (int) $user->member_id !== (int) $payment->member_id) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        return response()->json($this->transform($payment->loadMissing(['allocations', 'member'])));
     }
 
     public function store(Request $request)

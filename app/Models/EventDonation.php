@@ -38,6 +38,11 @@ class EventDonation extends Model
         return $this->belongsTo(FundraisingEvent::class, 'fundraising_event_id');
     }
 
+    public function member(): BelongsTo
+    {
+        return $this->belongsTo(Member::class);
+    }
+
     public function referredBy(): BelongsTo
     {
         return $this->belongsTo(Member::class, 'referred_by_member_id');

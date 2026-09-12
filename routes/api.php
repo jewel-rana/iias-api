@@ -60,11 +60,13 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/payments', [PaymentController::class, 'index']);
         Route::post('/payments', [PaymentController::class, 'store']);
+        Route::get('/payments/{payment}', [PaymentController::class, 'show']);
         Route::post('/payments/{payment}/approve', [PaymentController::class, 'approve']);
         Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject']);
 
         Route::get('/events', [EventController::class, 'index']);
         Route::post('/events', [EventController::class, 'store']);
+        Route::get('/donations', [EventController::class, 'donations']);
         Route::post('/events/{event}/donations', [EventController::class, 'donate']);
 
         Route::get('/reports/monthly-collection', [ReportController::class, 'monthly']);

@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\PaymentAllocationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class MemberController extends Controller
@@ -26,7 +27,29 @@ class MemberController extends Controller
             });
         }
 
-        if ($status = $request->string('status')->toString()) {
+        $status = $request->string('status')->toString();
+        $billingMonth = $request->string('billing_month')->toString();
+
+        if ($billingMonth !== '') {
+            try {
+                $month = Carbon::parse($billingMonth)->startOfMonth();
+            } catch (\Throwable) {
+                $month = now()->startOfMonth();
+            }
+            $monthDate = $month->toDateString();
+            $end = $month->copy()->endOfMonth()->toDateString();
+            $query->where(function ($q) use ($end) {
+                $q->whereNull('joined_at')->orWhereDate('joined_at', '<=', $end);
+            });
+            if ($status === 'unpaid') {
+                $query->where(function ($q) use ($monthDate) {
+                    $q->whereHas('dues', fn ($d) => $d->whereDate('billing_month', $monthDate)->where('status', 'unpaid'))
+                        ->orWhereDoesntHave('dues', fn ($d) => $d->whereDate('billing_month', $monthDate));
+                });
+            } elseif ($status !== '') {
+                $query->whereHas('dues', fn ($d) => $d->whereDate('billing_month', $monthDate)->where('status', $status));
+            }
+        } elseif ($status !== '') {
             $query->where('status', $status);
         }
 
