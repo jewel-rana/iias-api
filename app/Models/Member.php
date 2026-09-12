@@ -42,4 +42,21 @@ class Member extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    public static function findByPhone(string $phone): ?self
+    {
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+        if ($phone === '' && $digits === '') {
+            return null;
+        }
+
+        return static::query()
+            ->where(function ($q) use ($phone, $digits) {
+                $q->where('phone', $phone);
+                if ($digits !== '') {
+                    $q->orWhere('phone', $digits);
+                }
+            })
+            ->first();
+    }
 }

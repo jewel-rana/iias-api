@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
+        ->middleware('throttle:5,1');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
+        ->middleware('throttle:10,1');
     Route::post('/join-requests', [JoinRequestController::class, 'store']);
 
     Route::get('/public/events/{slug}', [EventController::class, 'publicShow']);

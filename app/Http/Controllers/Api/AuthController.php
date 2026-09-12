@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Member;
 use App\Models\User;
+use App\Services\PasswordResetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -17,14 +19,21 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $phone = preg_replace('/\D+/', '', $data['phone']);
-        $user = User::query()
-            ->where(function ($q) use ($phone, $data) {
-                $q->where('phone', $phone)->orWhere('phone', $data['phone']);
-            })
-            ->first();
+        $user = User::findByPhone($data['phone']);
 
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
+        if (! $user) {
+            if (Member::findByPhone($data['phone'])) {
+                throw ValidationException::withMessages([
+                    'password' => ['Password is not set. Use Forgot password to create one.'],
+                ]);
+            }
+
+            throw ValidationException::withMessages([
+                'phone' => ['Invalid phone or password.'],
+            ]);
+        }
+
+        if (! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'phone' => ['Invalid phone or password.'],
             ]);
@@ -62,5 +71,34 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out']);
+    }
+
+    public function forgotPassword(Request $request, PasswordResetService $resets)
+    {
+        $data = $request->validate([
+            'phone' => ['required', 'string'],
+        ]);
+
+        $debugCode = $resets->requestCode($data['phone']);
+
+        return response()->json(array_filter([
+            'message' => 'If this number is registered, a reset code was sent.',
+            'debug_code' => $debugCode,
+        ]));
+    }
+
+    public function resetPassword(Request $request, PasswordResetService $resets)
+    {
+        $data = $request->validate([
+            'phone' => ['required', 'string'],
+            'code' => ['required', 'string', 'size:6'],
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        $resets->reset($data['phone'], $data['code'], $data['password']);
+
+        return response()->json([
+            'message' => 'Password updated. You can log in now.',
+        ]);
     }
 }

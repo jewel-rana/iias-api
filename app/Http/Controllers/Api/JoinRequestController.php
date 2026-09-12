@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Member;
 use App\Models\MemberJoinRequest;
-use App\Models\User;
 use App\Services\PaymentAllocationService;
 use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class JoinRequestController extends Controller
@@ -19,6 +17,7 @@ class JoinRequestController extends Controller
         private PaymentAllocationService $dues,
         private PushNotificationService $push,
     ) {}
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -92,17 +91,6 @@ class JoinRequestController extends Controller
             ]);
 
             $this->dues->ensureDuesFromJoinDate($member->fresh());
-
-            User::query()->updateOrCreate(
-                ['phone' => preg_replace('/\D+/', '', $joinRequest->phone)],
-                [
-                    'name' => $joinRequest->full_name,
-                    'email' => $joinRequest->email ?: preg_replace('/\D+/', '', $joinRequest->phone).'@ummah.local',
-                    'password' => Hash::make('member'),
-                    'role' => 'member',
-                    'member_id' => $member->id,
-                ]
-            );
 
             $joinRequest->update([
                 'status' => 'approved',
