@@ -15,6 +15,7 @@ use App\Models\OrganizationSetting;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\User;
+use App\Services\GoLiveService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -23,6 +24,12 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
+        if (GoLiveService::isLive()) {
+            throw new \RuntimeException(
+                'Application is in live mode. Demo seeding is disabled.'
+            );
+        }
+
         $admin = User::query()->updateOrCreate(
             ['email' => 'admin@ummah.local'],
             [

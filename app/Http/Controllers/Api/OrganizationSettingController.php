@@ -43,6 +43,8 @@ class OrganizationSettingController extends Controller
             'currency_symbol' => $s->currency_symbol,
             'referral_enabled' => $s->referral_enabled,
             'public_join_enabled' => $s->public_join_enabled,
+            'is_live' => (bool) $s->is_live,
+            'went_live_at' => $s->went_live_at?->toIso8601String(),
         ];
     }
 }

@@ -25,6 +25,8 @@ class OrganizationSetting extends Model
             'opening_fund_balance' => 'integer',
             'referral_enabled' => 'bool',
             'public_join_enabled' => 'bool',
+            'is_live' => 'bool',
+            'went_live_at' => 'datetime',
         ];
     }
 
