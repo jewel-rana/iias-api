@@ -128,6 +128,30 @@ class MemberPaymentEditTest extends TestCase
         $this->assertSame('unpaid', $due->status);
     }
 
+    public function test_payment_can_cover_a_month_three_years_back(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $member = $this->member(['joined_at' => now()->startOfMonth()->toDateString()]);
+        $month = now()->startOfMonth()->subMonths(36)->toDateString();
+
+        $this->postJson('/api/v1/payments', [
+            'member_id' => $member->id,
+            'amount' => 500,
+            'payment_method' => 'cash_to_collector',
+            'allocations' => [[
+                'billing_month' => $month,
+                'amount' => 500,
+            ]],
+        ])->assertCreated()
+            ->assertJsonPath('allocations.0.billing_month', $month);
+
+        $this->assertDatabaseHas('monthly_dues', [
+            'member_id' => $member->id,
+            'amount_paid' => 500,
+            'status' => 'paid',
+        ]);
+    }
+
     public function test_member_cannot_delete_a_payment(): void
     {
         Sanctum::actingAs($this->admin());

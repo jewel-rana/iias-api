@@ -46,7 +46,7 @@ class PaymentController extends Controller
             $query->where('member_id', $request->user()->member_id);
         }
 
-        $payments = $query->limit(200)->get();
+        $payments = $query->limit(500)->get();
 
         return response()->json([
             'data' => $payments->map(fn (Payment $p) => $this->transform($p)),

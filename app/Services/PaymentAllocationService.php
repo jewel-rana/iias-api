@@ -18,6 +18,9 @@ class PaymentAllocationService
 
     public const STATUS_REJECTED = 'rejected';
 
+    /** Oldest unpaid month generated from join date, counting back from today. */
+    public const DUES_LOOKBACK_MONTHS = 36;
+
     /**
      * @param  array<int, array{billing_month: string, amount: int}>  $allocations
      */
@@ -260,7 +263,7 @@ class PaymentAllocationService
             $end = $start->copy();
         }
 
-        $maxStart = $end->copy()->subMonths(35);
+        $maxStart = $end->copy()->subMonths(self::DUES_LOOKBACK_MONTHS);
         if ($start->lessThan($maxStart)) {
             $start = $maxStart;
         }
