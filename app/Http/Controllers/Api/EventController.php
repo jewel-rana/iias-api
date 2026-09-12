@@ -113,7 +113,7 @@ class EventController extends Controller
 
         $donation = DB::transaction(function () use ($event, $data, $key, $request, $memberId) {
             $donation = EventDonation::query()->create([
-                'receipt_number' => 'D-'.(20000 + EventDonation::query()->count() + 1),
+                'receipt_number' => $this->nextDonationReceiptNumber(),
                 'fundraising_event_id' => $event->id,
                 'donor_type' => $data['donor_type'],
                 'member_id' => $memberId,
@@ -198,5 +198,17 @@ class EventController extends Controller
             'payment_date' => $d->payment_date?->toIso8601String(),
             'referred_by_name' => $d->referredBy?->name,
         ];
+    }
+
+    private function nextDonationReceiptNumber(): string
+    {
+        $max = 20000;
+        foreach (EventDonation::query()->lockForUpdate()->pluck('receipt_number') as $receipt) {
+            if (is_string($receipt) && preg_match('/^D-(\d+)$/', $receipt, $m)) {
+                $max = max($max, (int) $m[1]);
+            }
+        }
+
+        return 'D-'.($max + 1);
     }
 }

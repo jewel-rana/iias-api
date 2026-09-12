@@ -67,7 +67,7 @@ class PaymentAllocationService
             $allocationStatus = $requiresApproval ? 'pending' : 'applied';
 
             $payment = Payment::query()->create([
-                'receipt_number' => 'P-'.(10000 + Payment::query()->count() + 1),
+                'receipt_number' => $this->nextReceiptNumber(),
                 'member_id' => $member->id,
                 'amount' => $amount,
                 'payment_method' => $method,
@@ -329,5 +329,17 @@ class PaymentAllocationService
             'advance_months' => $advanceMonths,
             'status' => $status,
         ]);
+    }
+
+    private function nextReceiptNumber(): string
+    {
+        $max = 10000;
+        foreach (Payment::query()->lockForUpdate()->pluck('receipt_number') as $receipt) {
+            if (is_string($receipt) && preg_match('/^P-(\d+)$/', $receipt, $m)) {
+                $max = max($max, (int) $m[1]);
+            }
+        }
+
+        return 'P-'.($max + 1);
     }
 }

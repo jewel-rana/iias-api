@@ -178,6 +178,32 @@ class MemberPaymentEditTest extends TestCase
         $this->assertDatabaseHas('payments', ['id' => $paymentId]);
     }
 
+    public function test_new_payment_receipt_skips_existing_numbers(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $member = $this->member(['joined_at' => now()->startOfMonth()->toDateString()]);
+
+        \App\Models\Payment::query()->create([
+            'receipt_number' => 'P-10005',
+            'member_id' => $member->id,
+            'amount' => 500,
+            'payment_method' => 'hand_cash',
+            'payment_date' => now(),
+            'status' => 'confirmed',
+            'idempotency_key' => 'existing-10005',
+        ]);
+
+        $this->postJson('/api/v1/payments', [
+            'member_id' => $member->id,
+            'amount' => 500,
+            'payment_method' => 'hand_cash',
+            'allocations' => [[
+                'billing_month' => now()->startOfMonth()->toDateString(),
+                'amount' => 500,
+            ]],
+        ])->assertCreated()->assertJsonPath('receipt_number', 'P-10006');
+    }
+
     private function admin(): User
     {
         return User::factory()->create([
