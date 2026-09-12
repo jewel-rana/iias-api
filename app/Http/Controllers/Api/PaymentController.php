@@ -9,11 +9,15 @@ use App\Models\Member;
 use App\Models\OrganizationSetting;
 use App\Models\Payment;
 use App\Services\PaymentAllocationService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
-    public function __construct(private PaymentAllocationService $service) {}
+    public function __construct(
+        private PaymentAllocationService $service,
+        private PushNotificationService $push,
+    ) {}
 
     public function index(Request $request)
     {
@@ -80,6 +84,22 @@ class PaymentController extends Controller
             submittedByRole: $user?->role,
         );
 
+        $payment->loadMissing('member');
+        if ($isMemberSelf) {
+            $this->push->notifyStaff(
+                'Payment pending approval',
+                ($payment->member?->name ?? 'A member').' submitted ৳'.number_format($payment->amount),
+                ['type' => 'payment_pending', 'route' => '/payment-approvals'],
+            );
+        } else {
+            $this->push->notifyMember(
+                (int) $payment->member_id,
+                'Payment recorded',
+                '৳'.number_format($payment->amount).' received. Receipt '.$payment->receipt_number,
+                ['type' => 'payment_confirmed', 'route' => '/member-home'],
+            );
+        }
+
         return response()->json($this->transform($payment), 201);
     }
 
@@ -90,6 +110,13 @@ class PaymentController extends Controller
         }
 
         $payment = $this->service->approve($payment, $request->user()?->id);
+        $payment->loadMissing('member');
+        $this->push->notifyMember(
+            (int) $payment->member_id,
+            'Payment confirmed',
+            '৳'.number_format($payment->amount).' was approved. Receipt '.$payment->receipt_number,
+            ['type' => 'payment_confirmed', 'route' => '/member-home'],
+        );
 
         return response()->json($this->transform($payment));
     }
@@ -108,6 +135,13 @@ class PaymentController extends Controller
             $payment,
             $data['reason'] ?? null,
             $request->user()?->id,
+        );
+        $payment->loadMissing('member');
+        $this->push->notifyMember(
+            (int) $payment->member_id,
+            'Payment rejected',
+            $data['reason'] ?: ('Receipt '.$payment->receipt_number.' was rejected.'),
+            ['type' => 'payment_rejected', 'route' => '/member-home'],
         );
 
         return response()->json($this->transform($payment));

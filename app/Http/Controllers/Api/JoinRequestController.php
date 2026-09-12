@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\MemberJoinRequest;
 use App\Models\User;
 use App\Services\PaymentAllocationService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -14,7 +15,10 @@ use Illuminate\Support\Str;
 
 class JoinRequestController extends Controller
 {
-    public function __construct(private PaymentAllocationService $dues) {}
+    public function __construct(
+        private PaymentAllocationService $dues,
+        private PushNotificationService $push,
+    ) {}
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -39,6 +43,12 @@ class JoinRequestController extends Controller
             'referred_by_member_id' => $referredBy,
             'status' => 'submitted',
         ]);
+
+        $this->push->notifyStaff(
+            'New join request',
+            $join->full_name.' asked to join.',
+            ['type' => 'join_request', 'route' => '/join-requests'],
+        );
 
         return response()->json($this->transform($join), 201);
     }

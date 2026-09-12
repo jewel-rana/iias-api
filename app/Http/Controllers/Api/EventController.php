@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\EventDonation;
 use App\Models\FundraisingEvent;
 use App\Models\Member;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class EventController extends Controller
 {
+    public function __construct(private PushNotificationService $push) {}
     public function index(Request $request)
     {
         $query = FundraisingEvent::query()->orderByDesc('starts_at');
@@ -88,6 +90,12 @@ class EventController extends Controller
 
             return $donation->load('event', 'referredBy');
         });
+
+        $this->push->notifyStaff(
+            'Donation received',
+            $donation->donor_name.' donated ৳'.number_format((int) $donation->amount).' to '.$event->title,
+            ['type' => 'donation', 'route' => '/events'],
+        );
 
         return response()->json($this->transformDonation($donation), 201);
     }

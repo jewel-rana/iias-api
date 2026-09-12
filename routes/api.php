@@ -3,10 +3,12 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CommitteeMemberController;
 use App\Http\Controllers\Api\CommitteeRoleController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\ExpenseHeadController;
 use App\Http\Controllers\Api\JoinRequestController;
+use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\OrganizationSettingController;
 use App\Http\Controllers\Api\PaymentController;
@@ -24,6 +26,8 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
+        Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
 
         Route::get('/dashboard', [PaymentController::class, 'dashboard']);
 
@@ -55,6 +59,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/join-requests', [JoinRequestController::class, 'index']);
         Route::post('/join-requests/{joinRequest}/approve', [JoinRequestController::class, 'approve']);
         Route::post('/join-requests/{joinRequest}/reject', [JoinRequestController::class, 'reject']);
+
+        Route::get('/meetings', [MeetingController::class, 'index']);
+        Route::post('/meetings', [MeetingController::class, 'store']);
+        Route::get('/meetings/{meeting}', [MeetingController::class, 'show']);
+        Route::put('/meetings/{meeting}', [MeetingController::class, 'update']);
 
         Route::get('/organization-settings', [OrganizationSettingController::class, 'show']);
         Route::put('/organization-settings', [OrganizationSettingController::class, 'update']);
