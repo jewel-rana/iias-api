@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\PaymentAllocationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class MemberController extends Controller
 {
@@ -115,27 +116,43 @@ class MemberController extends Controller
             return response()->json(['message' => 'Only staff can update members.'], 403);
         }
 
+        $user = User::query()->where('member_id', $member->id)->first();
+
         $data = $request->validate([
-            'email' => ['sometimes', 'email', 'max:120', 'unique:members,email,'.$member->id],
+            'name' => ['sometimes', 'string', 'max:120'],
+            'phone' => [
+                'sometimes',
+                'string',
+                'max:30',
+                Rule::unique('members', 'phone')->ignore($member->id),
+                Rule::unique('users', 'phone')->ignore($user?->id),
+            ],
+            'email' => [
+                'sometimes',
+                'email',
+                'max:120',
+                Rule::unique('members', 'email')->ignore($member->id),
+                Rule::unique('users', 'email')->ignore($user?->id),
+            ],
             'role_id' => ['sometimes', 'exists:roles,id'],
             'monthly_amount' => ['sometimes', 'integer', 'min:1'],
         ]);
 
         $member->update($data);
 
-        $user = User::query()->where('member_id', $member->id)->first();
-        if ($user && isset($data['email']) && preg_match('/^\d+(\.\d+)?@ummah\.local$/i', (string) $user->email)) {
-            $user->email = $data['email'];
-            $user->save();
-        }
-
-        if (array_key_exists('role_id', $data)) {
-            $role = Role::query()->find($data['role_id']);
-            if ($user && $role && $user->role !== 'admin') {
-                $user->role = $role->code;
-                $user->role_id = $role->id;
-                $user->save();
+        if ($user) {
+            $account = array_intersect_key($data, array_flip(['name', 'phone', 'email']));
+            if ($account !== []) {
+                $user->fill($account);
             }
+            if (array_key_exists('role_id', $data)) {
+                $role = Role::query()->find($data['role_id']);
+                if ($role && $user->role !== 'admin') {
+                    $user->role = $role->code;
+                    $user->role_id = $role->id;
+                }
+            }
+            $user->save();
         }
 
         if (array_key_exists('monthly_amount', $data)) {

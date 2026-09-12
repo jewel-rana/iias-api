@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\PasswordResetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -50,6 +51,51 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         return response()->json($this->payload($request->user()));
+    }
+
+    public function update(Request $request)
+    {
+        $user = $request->user();
+        $memberId = $user->member_id;
+
+        $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:120'],
+            'phone' => [
+                'sometimes',
+                'string',
+                'max:30',
+                Rule::unique('users', 'phone')->ignore($user->id),
+                Rule::unique('members', 'phone')->ignore($memberId),
+            ],
+            'email' => [
+                'sometimes',
+                'email',
+                'max:120',
+                Rule::unique('users', 'email')->ignore($user->id),
+                Rule::unique('members', 'email')->ignore($memberId),
+            ],
+            'current_password' => ['required_with:password'],
+            'password' => ['nullable', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        if (! empty($data['password'])) {
+            if (! Hash::check((string) ($data['current_password'] ?? ''), $user->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => ['The current password is incorrect.'],
+                ]);
+            }
+            $user->password = $data['password'];
+        }
+
+        $profile = array_intersect_key($data, array_flip(['name', 'phone', 'email']));
+        $user->fill($profile);
+        $user->save();
+
+        if ($memberId && $profile !== []) {
+            Member::query()->where('id', $memberId)->update($profile);
+        }
+
+        return response()->json($this->payload($user->fresh()->loadMissing('accessRole')));
     }
 
     public function logout(Request $request)
@@ -100,6 +146,7 @@ class AuthController extends Controller
             'id' => (string) $user->id,
             'name' => $user->name,
             'phone' => $user->phone,
+            'email' => $user->email,
             'role' => $user->role,
             'role_name' => $user->accessRole?->name ?? $user->role,
             'permissions' => $user->permissionKeys(),
